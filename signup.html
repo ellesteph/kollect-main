@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kollect | Sign Up</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+body { margin:0; font-family:'Inter', sans-serif; background:#fff; color:#000; }
+.container { max-width:500px; margin:5rem auto; padding:2rem; border:1px solid #000; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.05); }
+h2 { text-align:center; margin-bottom:2rem; font-weight:700; }
+input, select { width:100%; padding:0.8rem; margin:0.8rem 0; border:1px solid #000; border-radius:6px; font-size:1rem; transition: all 0.3s ease; }
+input:focus, select:focus { border-color:#000; box-shadow:0 0 5px rgba(0,0,0,0.2); outline:none; }
+button.primary { width:100%; padding:0.8rem; background:#000; color:#fff; border:none; font-weight:600; font-size:1rem; border-radius:6px; cursor:pointer; margin-top:1rem; transition: all 0.3s ease; }
+button.primary:hover { transform:translateY(-2px); opacity:0.85; }
+
+/* Tab selection */
+.tab-selector { display:flex; justify-content:space-around; margin-bottom:2rem; }
+.tab-selector button { flex:1; padding:0.8rem 1rem; font-weight:600; border:none; cursor:pointer; border-radius:6px; transition: all 0.3s ease; background:#fff; border:2px solid #000; }
+.tab-selector button.active { background:#000; color:#fff; }
+
+/* Smooth show/hide */
+.tab-content { display:none; opacity:0; transform:translateY(20px); transition: all 0.5s ease; }
+.tab-content.active { display:block; opacity:1; transform:translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Create Your Kollect Account</h2>
+
+    <!-- User Type Tabs -->
+    <div class="tab-selector">
+        <button id="individualBtn" class="active" onclick="showUserType('individual')">Individual</button>
+        <button id="businessBtn" onclick="showUserType('business')">Business</button>
+    </div>
+
+    <!-- Individual Signup -->
+    <div id="individual" class="tab-content active">
+        <input id="fullName" placeholder="Full Name">
+        <input id="email" type="email" placeholder="Email">
+        <input id="phone" type="tel" placeholder="Phone Number">
+        <input id="password" type="password" placeholder="Password">
+        <button class="primary" onclick="signUp()">Sign Up</button>
+    </div>
+
+    <!-- Business Signup -->
+    <div id="business" class="tab-content">
+        <input id="businessName" placeholder="Business Name">
+        <select id="businessType">
+            <option value="">Select Business Type</option>
+            <option value="Retail">Retail</option>
+            <option value="Food & Beverage">Food & Beverage</option>
+            <option value="Tech">Tech</option>
+            <option value="Services">Services</option>
+            <option value="Other">Other</option>
+        </select>
+        <input id="emailBus" type="email" placeholder="Email">
+        <input id="phoneBus" type="tel" placeholder="Phone Number">
+        <input id="passwordBus" type="password" placeholder="Password">
+        <button class="primary" onclick="signUp()">Sign Up</button>
+    </div>
+</div>
+
+<script src="firebase.js"></script>
+<script>
+// Toggle Individual / Business tabs
+function showUserType(type){
+    const individual = document.getElementById("individual");
+    const business = document.getElementById("business");
+    const individualBtn = document.getElementById("individualBtn");
+    const businessBtn = document.getElementById("businessBtn");
+
+    if(type==='individual'){
+        individual.classList.add("active");
+        business.classList.remove("active");
+        individualBtn.classList.add("active");
+        businessBtn.classList.remove("active");
+    } else {
+        individual.classList.remove("active");
+        business.classList.add("active");
+        individualBtn.classList.remove("active");
+        businessBtn.classList.add("active");
+    }
+}
+
+// Signup function
+function signUp(){
+    const userType = document.getElementById("individual").classList.contains("active") ? "individual" : "business";
+    let userData = {};
+    let email, phone, password;
+
+    if(userType === "individual"){
+        const fullName = document.getElementById("fullName").value;
+        email = document.getElementById("email").value;
+        phone = document.getElementById("phone").value;
+        password = document.getElementById("password").value;
+
+        if(!fullName || !email || !phone || !password) return alert("Please fill all fields");
+        userData = { fullName, email, phone };
+    } else {
+        const businessName = document.getElementById("businessName").value;
+        const businessType = document.getElementById("businessType").value;
+        email = document.getElementById("emailBus").value;
+        phone = document.getElementById("phoneBus").value;
+        password = document.getElementById("passwordBus").value;
+
+        if(!businessName || !businessType || !email || !phone || !password) return alert("Please fill all fields");
+        userData = { businessName, businessType, email, phone };
+    }
+
+    auth.createUserWithEmailAndPassword(email, password)
+    .then(userCredential=>{
+        const userId = userCredential.user.uid;
+        db.collection("users").doc(userId).set({
+            userType,
+            details: userData,
+            wallet: { NGN:0, GHS:0, RWF:0 },
+            transactions: []
+        }).then(()=> {
+            alert("Account created successfully!");
+            window.location.href = "dashboard.html";
+        });
+    })
+    .catch(error => alert(error.message));
+}
+</script>
+
+</body>
+</html>
