@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kollect Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://checkout.flutterwave.com/v3.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+<style>
+body { margin:0; font-family:'Inter', sans-serif; background:#fff; color:#000; }
+header { padding:1rem 2rem; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #000; position:sticky; top:0; background:#fff; z-index:10;}
+header h1 { margin:0; font-weight:700; }
+header button { background:#000; color:#fff; border:none; padding:0.5rem 1rem; cursor:pointer; border-radius:5px; transition:0.3s; }
+header button:hover { opacity:0.85; transform:translateY(-2px); }
+
+.container { max-width:1000px; margin:2rem auto; padding:2rem; }
+
+.tab-bar { display:flex; gap:1rem; margin-bottom:2rem; flex-wrap:wrap; }
+.tab-bar button { flex:1; padding:0.8rem; border:none; border-radius:5px; font-weight:600; cursor:pointer; background:#000; color:#fff; transition:0.3s; }
+.tab-bar button.active { background:#fff; color:#000; border:2px solid #000; }
+
+.tab-content { display:none; opacity:0; transform:translateY(20px); transition:0.5s ease; }
+.tab-content.active { display:block; opacity:1; transform:translateY(0); }
+
+input, select { width:100%; padding:0.8rem; margin:0.8rem 0; border:1px solid #000; border-radius:5px; font-size:1rem; transition:0.3s; }
+input:focus, select:focus { outline:none; border-color:#000; box-shadow:0 0 5px rgba(0,0,0,0.2); }
+
+button.primary { background:#000; color:#fff; border:none; padding:0.8rem 1rem; border-radius:5px; cursor:pointer; font-weight:600; transition:0.3s; margin-top:0.5rem; }
+button.primary:hover { transform:translateY(-2px); opacity:0.9; }
+button.primary.small { padding:0.5rem; font-size:0.9rem; width:fit-content; }
+
+.wallet-cards { display:flex; gap:1rem; flex-wrap:wrap; margin-top:1rem; }
+.wallet-card { flex:1 1 220px; max-width:250px; background:#000; color:#fff; border-radius:12px; padding:1rem; display:flex; flex-direction:column; justify-content:space-between; box-shadow:0 3px 15px rgba(0,0,0,0.1); transition:0.3s; }
+.wallet-card:hover { transform:translateY(-2px); box-shadow:0 5px 20px rgba(0,0,0,0.15); }
+.wallet-header { display:flex; justify-content:space-between; font-weight:600; font-size:0.95rem; margin-bottom:0.8rem; }
+.wallet-balance { font-size:1.3rem; font-weight:700; margin-bottom:0.5rem; }
+
+.transactions { max-height:300px; overflow-y:auto; border:1px solid #000; padding:1rem; margin-top:1rem; }
+.transaction-item { display:flex; justify-content:space-between; padding:0.5rem 0; border-bottom:1px solid #000; }
+
+.card-section { margin-bottom:2rem; }
+</style>
+</head>
+<body>
+
+<header>
+<h1>Kollect Dashboard</h1>
+<button onclick="logout()">Logout</button>
+</header>
+
+<div class="container">
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="openTab(event,'wallet')">Wallet</button>
+        <button class="tab-btn" onclick="openTab(event,'fund')">Fund Wallet</button>
+        <button class="tab-btn" onclick="openTab(event,'pos')">Virtual POS</button>
+        <button class="tab-btn" onclick="openTab(event,'payments')">Payments & Transfers</button>
+        <button class="tab-btn" onclick="openTab(event,'transactions')">Transactions</button>
+        <button class="tab-btn" onclick="openTab(event,'receive')">Receive Payment</button>
+    </div>
+
+    <!-- Wallet Tab -->
+    <div id="wallet" class="tab-content active">
+        <h2>Wallet Balances</h2>
+        <div class="wallet-cards">
+            <div class="wallet-card">
+                <div class="wallet-header"><span>₦</span><span>Naira Wallet</span></div>
+                <div class="wallet-balance" id="balance-ngn">₦0</div>
+                <button class="primary small" onclick="openTab(null,'fund')">Add Funds</button>
+            </div>
+            <div class="wallet-card">
+                <div class="wallet-header"><span>GH₵</span><span>Cedis Wallet</span></div>
+                <div class="wallet-balance" id="balance-ghc">GH₵0</div>
+                <button class="primary small" onclick="openTab(null,'fund')">Add Funds</button>
+            </div>
+            <div class="wallet-card">
+                <div class="wallet-header"><span>RWF</span><span>Rwandan Franc Wallet</span></div>
+                <div class="wallet-balance" id="balance-rwf">RWF0</div>
+                <button class="primary small" onclick="openTab(null,'fund')">Add Funds</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fund Wallet Tab -->
+    <div id="fund" class="tab-content">
+        <h2>Fund Your Wallet</h2>
+        <div class="card-section">
+            <select id="fundCurrency">
+                <option value="NGN">Naira (₦)</option>
+                <option value="GH₵">Cedis (GH₵)</option>
+                <option value="RWF">Rwandan Franc (RWF)</option>
+            </select>
+            <input type="number" id="fundAmount" placeholder="Enter Amount">
+            <label>Select Funding Method:</label>
+            <select id="fundMethod">
+                <option value="card">Card Payment</option>
+                <option value="bank">Bank Transfer</option>
+                <option value="ussd">USSD</option>
+            </select>
+            <div id="cardFields">
+                <input type="text" id="cardNumber" placeholder="Card Number">
+                <input type="text" id="cardExpiry" placeholder="MM/YY">
+                <input type="text" id="cardCVC" placeholder="CVC">
+            </div>
+            <button class="primary" onclick="fundWallet()">Fund Wallet</button>
+        </div>
+    </div>
+
+    <!-- Virtual POS Tab -->
+    <div id="pos" class="tab-content">
+        <h2>Virtual POS - Accept Payments</h2>
+        <div class="wallet-cards">
+            <!-- Naira POS -->
+            <div class="wallet-card">
+                <div class="wallet-header"><span>₦</span><span>Naira POS</span></div>
+                <input type="number" id="posAmountNGN" placeholder="Amount in Naira">
+                <input type="text" id="posCardNumberNGN" placeholder="Card Number">
+                <input type="text" id="posCardExpiryNGN" placeholder="MM/YY">
+                <input type="text" id="posCardCVCNGN" placeholder="CVC">
+                <button class="primary small" onclick="collectPayment('NGN')">Charge ₦</button>
+            </div>
+            <!-- USD POS -->
+            <div class="wallet-card">
+                <div class="wallet-header"><span>$</span><span>USD POS</span></div>
+                <input type="number" id="posAmountUSD" placeholder="Amount in USD">
+                <input type="text" id="posCardNumberUSD" placeholder="Card Number">
+                <input type="text" id="posCardExpiryUSD" placeholder="MM/YY">
+                <input type="text" id="posCardCVCUSD" placeholder="CVC">
+                <button class="primary small" onclick="collectPayment('USD')">Charge $</button>
+            </div>
+            <!-- Cedis POS -->
+            <div class="wallet-card">
+                <div class="wallet-header"><span>GH₵</span><span>Cedis POS</span></div>
+                <input type="number" id="posAmountGHC" placeholder="Amount in Cedis">
+                <input type="text" id="posCardNumberGHC" placeholder="Card Number">
+                <input type="text" id="posCardExpiryGHC" placeholder="MM/YY">
+                <input type="text" id="posCardCVCGHC" placeholder="CVC">
+                <button class="primary small" onclick="collectPayment('GH₵')">Charge GH₵</button>
+            </div>
+            <!-- RWF POS -->
+            <div class="wallet-card">
+                <div class="wallet-header"><span>RWF</span><span>RWF POS</span></div>
+                <input type="number" id="posAmountRWF" placeholder="Amount in RWF">
+                <input type="text" id="posCardNumberRWF" placeholder="Card Number">
+                <input type="text" id="posCardExpiryRWF" placeholder="MM/YY">
+                <input type="text" id="posCardCVCRWF" placeholder="CVC">
+                <button class="primary small" onclick="collectPayment('RWF')">Charge RWF</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payments & Transfers -->
+    <div id="payments" class="tab-content">
+        <h2>Payments & Transfers</h2>
+        <select id="paymentCurrency">
+            <option value="NGN">Naira (₦)</option>
+            <option value="GH₵">Cedis (GH₵)</option>
+            <option value="RWF">Rwandan Franc (RWF)</option>
+        </select>
+        <button class="primary" onclick="sendToUser()">Send to Kollect User</button>
+        <button class="primary" onclick="withdraw()">Withdraw to Bank</button>
+    </div>
+
+    <!-- Receive Payment Tab -->
+    <div id="receive" class="tab-content">
+        <h2>Receive Payment</h2>
+        <div class="card-section">
+            <select id="receiveCurrency">
+                <option value="NGN">Naira (₦)</option>
+                <option value="USD">USD ($)</option>
+                <option value="GH₵">Cedis (GH₵)</option>
+                <option value="RWF">Rwandan Franc (RWF)</option>
+            </select>
+            <input type="number" id="receiveAmount" placeholder="Enter Amount to Receive">
+            <button class="primary" onclick="generatePaymentRequest()">Generate Payment Link</button>
+            <p id="receiveLink"></p>
+        </div>
+    </div>
+
+    <!-- Transactions Tab -->
+    <div id="transactions" class="tab-content">
+        <h2>Recent Transactions</h2>
+        <div id="transaction-list" class="transactions"></div>
+    </div>
+</div>
+
+<script src="firebase.js"></script>
+<script src="app.js"></script>
+<script>
+// Tab switching
+function openTab(evt, tabName){
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(tc => tc.classList.remove('active'));
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => btn.classList.remove('active'));
+    document.getElementById(tabName).classList.add('active');
+    if(evt) evt.currentTarget.classList.add('active');
+}
+</script>
+</body>
+</html>
