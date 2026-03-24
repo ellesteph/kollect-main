@@ -62,8 +62,20 @@ button.primary:hover { transform:translateY(-2px); opacity:0.85; }
     </div>
 </div>
 
-<script src="firebase.js"></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 <script>
+const firebaseConfig = {
+    apiKey: "PASTE_YOURS",
+    authDomain: "PASTE_YOURS",
+    projectId: "PASTE_YOURS",
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
 // Toggle Individual / Business tabs
 function showUserType(type){
     const individual = document.getElementById("individual");
@@ -91,19 +103,19 @@ function signUp(){
     let email, phone, password;
 
     if(userType === "individual"){
-        const fullName = document.getElementById("fullName").value;
-        email = document.getElementById("email").value;
-        phone = document.getElementById("phone").value;
-        password = document.getElementById("password").value;
+        const fullName = document.getElementById("fullName").value.trim();
+        email = document.getElementById("email").value.trim();
+        phone = document.getElementById("phone").value.trim();
+        password = document.getElementById("password").value.trim();
 
         if(!fullName || !email || !phone || !password) return alert("Please fill all fields");
         userData = { fullName, email, phone };
     } else {
-        const businessName = document.getElementById("businessName").value;
+        const businessName = document.getElementById("businessName").value.trim();
         const businessType = document.getElementById("businessType").value;
-        email = document.getElementById("emailBus").value;
-        phone = document.getElementById("phoneBus").value;
-        password = document.getElementById("passwordBus").value;
+        email = document.getElementById("emailBus").value.trim();
+        phone = document.getElementById("phoneBus").value.trim();
+        password = document.getElementById("passwordBus").value.trim();
 
         if(!businessName || !businessType || !email || !phone || !password) return alert("Please fill all fields");
         userData = { businessName, businessType, email, phone };
