@@ -94,18 +94,20 @@ async function loadWalletBalances(uid){
     for(const currency of ["NGN","GH₵","RWF"]){
         const docRef = doc(db,"wallets",uid,"balances",currency);
         const docSnap = await getDoc(docRef);
+
         const el = (currency==="NGN")?document.getElementById("balance-ngn"):
                   (currency==="GH₵")?document.getElementById("balance-ghc"):
                   document.getElementById("balance-rwf");
-        el.innerText = currency + " " + (docSnap.exists()?docSnap.data().amount:0);
+
+        const newAmount = docSnap.exists()?docSnap.data().amount:0;
+
+        // Animate update
+        el.classList.add("balance-animate");
+        setTimeout(()=>el.classList.remove("balance-animate"),400);
+
+        el.innerText = currency + " " + newAmount;
     }
 }
-
-async function updateWalletBalanceDB(uid,currency,amount){
-    const docRef = doc(db,"wallets",uid,"balances",currency);
-    const docSnap = await getDoc(docRef);
-    const newAmount = docSnap.exists()?docSnap.data().amount + parseFloat(amount):parseFloat(amount);
-    await setDoc(docRef,{amount:newAmount});
 }
 
 // -------------------- TRANSACTIONS --------------------
