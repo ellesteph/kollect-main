@@ -1,30 +1,29 @@
-// -----------------------------------
-// FIREBASE REFERENCES
-// -----------------------------------
+// app.js
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// -----------------------------------
+// -------------------------
 // AUTH STATE LISTENER
-// -----------------------------------
+// -------------------------
 auth.onAuthStateChanged(user => {
     if(!user && !window.location.href.includes("login.html") && !window.location.href.includes("signup.html")){
-        // Not logged in → redirect to login
         window.location.href = "login.html";
     } else if(user && window.location.href.includes("login.html")){
-        // Already logged in → redirect to dashboard
+        window.location.href = "dashboard.html";
+    } else if(user && window.location.href.includes("signup.html")){
         window.location.href = "dashboard.html";
     } else if(user){
-        // Load wallets & transactions on dashboard
         loadWalletBalances(user.uid);
         loadTransactions(user.uid);
     }
 });
 
-// -----------------------------------
-// SIGN UP FUNCTION
-// -----------------------------------
-function signUp(){
+// -------------------------
+// SIGN UP
+// -------------------------
+function signUp(event){
+    if(event) event.preventDefault();
+
     const type = document.getElementById("accountType").value;
     let email, password, extraData;
 
@@ -34,86 +33,60 @@ function signUp(){
         email = document.getElementById("email").value;
         password = document.getElementById("password").value;
         const profession = document.getElementById("profession").value;
-
-        if(!name || !phone || !email || !password || !profession) return alert("Please fill all fields");
-
+        if(!name || !phone || !email || !password || !profession) return alert("Fill all fields");
         extraData = {name, phone, profession, type:"individual"};
-
     } else if(type === "business"){
         const businessName = document.getElementById("businessName").value;
         const businessPhone = document.getElementById("businessPhone").value;
         email = document.getElementById("businessEmail").value;
         password = document.getElementById("businessPassword").value;
         const businessType = document.getElementById("businessType").value;
-
-        if(!businessName || !businessPhone || !email || !password || !businessType) return alert("Please fill all fields");
-
+        if(!businessName || !businessPhone || !email || !password || !businessType) return alert("Fill all fields");
         extraData = {businessName, businessPhone, businessType, type:"business"};
     }
 
-    // CREATE USER WITH FIREBASE AUTH
     auth.createUserWithEmailAndPassword(email, password)
-        .then(cred => {
+        .then(cred=>{
             const uid = cred.user.uid;
-
-            // SAVE ADDITIONAL INFO IN FIRESTORE
-            db.collection("users").doc(uid).set(extraData)
-              .then(()=>{
-                  // Initialize wallets for this user
-                  ["NGN","GH₵","RWF"].forEach(currency=>{
-                      db.collection("wallets").doc(uid).collection("balances").doc(currency).set({amount:0});
-                  });
-
-                  // Redirect to dashboard
-                  window.location.href = "dashboard.html";
-              })
-              .catch(err=> alert("Error saving user info: "+err.message));
-        })
-        .catch(err => alert("Error creating user: "+err.message));
+            db.collection("users").doc(uid).set(extraData).then(()=>{
+                ["NGN","GH₵","RWF"].forEach(currency=>{
+                    db.collection("wallets").doc(uid).collection("balances").doc(currency).set({amount:0});
+                });
+                window.location.href="dashboard.html";
+            }).catch(err=>alert(err.message));
+        }).catch(err=>alert(err.message));
 }
 
-// -----------------------------------
-// LOGIN FUNCTION
-// -----------------------------------
-function login(){
+// -------------------------
+// LOGIN
+// -------------------------
+function login(event){
+    if(event) event.preventDefault();
     const email = document.getElementById("loginEmail").value;
     const password = document.getElementById("loginPassword").value;
-
     if(!email || !password) return alert("Enter email and password");
-
     auth.signInWithEmailAndPassword(email, password)
-        .then(cred=>{
-            window.location.href = "dashboard.html";
-        })
-        .catch(err=> alert("Login error: "+err.message));
+        .then(cred=> window.location.href="dashboard.html")
+        .catch(err=>alert(err.message));
 }
 
-// -----------------------------------
+// -------------------------
 // LOGOUT
-// -----------------------------------
-function logout(){
-    auth.signOut();
-}
+// -------------------------
+function logout(){ auth.signOut(); }
 
-// -----------------------------------
-// WALLET FUNCTIONS
-// -----------------------------------
+// -------------------------
+// WALLETS
+// -------------------------
 function loadWalletBalances(uid){
-    const wallets = ["NGN","GH₵","RWF"];
-    wallets.forEach(currency=>{
-        db.collection("wallets").doc(uid).collection("balances").doc(currency)
-        .get().then(doc=>{
+    ["NGN","GH₵","RWF"].forEach(currency=>{
+        db.collection("wallets").doc(uid).collection("balances").doc(currency).get().then(doc=>{
             const el = (currency==="NGN")?document.getElementById("balance-ngn"):
-                      (currency==="GH₵")?document.getElementById("balance-ghc"):
-                      document.getElementById("balance-rwf");
-            if(doc.exists){
-                el.innerText = currency + " " + doc.data().amount;
-            } else {
-                el.innerText = currency + " 0";
-            }
-            // Bounce animation when balance updates
+                       (currency==="GH₵")?document.getElementById("balance-ghc"):
+                       document.getElementById("balance-rwf");
+            el.innerText = currency + " " + (doc.exists?doc.data().amount:0);
             el.classList.add("updated");
-            setTimeout(()=> el.classList.remove("updated"), 600);
+            setTimeout(()=>el.classList.remove("updated"),600);
         });
     });
 }
@@ -121,28 +94,19 @@ function loadWalletBalances(uid){
 function updateWalletBalanceDB(uid,currency,amount){
     const walletRef = db.collection("wallets").doc(uid).collection("balances").doc(currency);
     return walletRef.get().then(doc=>{
-        if(doc.exists){
-            let newAmount = doc.data().amount + parseFloat(amount);
-            walletRef.set({amount:newAmount});
-        } else {
-            walletRef.set({amount:parseFloat(amount)});
-        }
+        const newAmount = doc.exists?doc.data().amount + parseFloat(amount):parseFloat(amount);
+        walletRef.set({amount:newAmount});
     });
 }
 
-// -----------------------------------
+// -------------------------
 // TRANSACTIONS
-// -----------------------------------
+// -------------------------
 function addTransaction(uid,currency,amount,type){
-    const txnRef = db.collection("transactions").doc(uid).collection("userTxns");
-    txnRef.add({
-        type:type,
-        currency:currency,
-        amount:parseFloat(amount),
+    db.collection("transactions").doc(uid).collection("userTxns").add({
+        type, currency, amount:parseFloat(amount),
         timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(()=>{
-        loadTransactions(uid);
-    });
+    }).then(()=>loadTransactions(uid));
 }
 
 function loadTransactions(uid){
@@ -150,24 +114,24 @@ function loadTransactions(uid){
     if(!list) return;
     list.innerHTML="";
     db.collection("transactions").doc(uid).collection("userTxns")
-      .orderBy("timestamp","desc")
-      .limit(20)
-      .onSnapshot(snapshot=>{
-          list.innerHTML="";
-          snapshot.forEach(doc=>{
-              const data = doc.data();
-              const div = document.createElement("div");
-              div.className="transaction-item";
-              const date = data.timestamp ? data.timestamp.toDate().toLocaleDateString() : "";
-              div.innerHTML=`<span>${data.type}</span><span>${data.currency} ${data.amount}</span><span>${date}</span>`;
-              list.appendChild(div);
-          });
-      });
+        .orderBy("timestamp","desc")
+        .limit(20)
+        .onSnapshot(snapshot=>{
+            list.innerHTML="";
+            snapshot.forEach(doc=>{
+                const data = doc.data();
+                const div = document.createElement("div");
+                div.className="transaction-item";
+                const date = data.timestamp?data.timestamp.toDate().toLocaleDateString():"";
+                div.innerHTML=`<span>${data.type}</span><span>${data.currency} ${data.amount}</span><span>${date}</span>`;
+                list.appendChild(div);
+            });
+        });
 }
 
-// -----------------------------------
+// -------------------------
 // FUND WALLET
-// -----------------------------------
+// -------------------------
 function fundWallet(){
     const uid = auth.currentUser.uid;
     const currency = document.getElementById("fundCurrency").value;
@@ -175,12 +139,11 @@ function fundWallet(){
     if(!amount) return alert("Enter valid amount");
 
     FlutterwaveCheckout({
-        public_key: "FLWPUBK-005ee3c126a79286e3d25ba753637e43-X",
-        tx_ref: "FW-"+Date.now(),
-        amount: amount,
-        currency: currency,
+        public_key:"FLWPUBK-005ee3c126a79286e3d25ba753637e43-X",
+        tx_ref:"FW-"+Date.now(),
+        amount, currency,
         payment_options:"card",
-        customer:{ email:auth.currentUser.email, phonenumber:"0000000000", name:auth.currentUser.displayName || "User"},
+        customer:{email:auth.currentUser.email, phonenumber:"0000000000", name:auth.currentUser.displayName||"User"},
         callback:function(data){
             if(data.status==="successful"){
                 alert(`${currency} Wallet Funded Successfully`);
@@ -189,27 +152,27 @@ function fundWallet(){
                 loadWalletBalances(uid);
             } else alert("Payment failed");
         },
-        customizations:{ title:"Kollect Wallet Fund", description:"Fund your wallet", logo:"" }
+        customizations:{title:"Kollect Wallet Fund", description:"Fund your wallet", logo:""}
     });
 }
 
-// -----------------------------------
+// -------------------------
 // VIRTUAL POS
-// -----------------------------------
+// -------------------------
 function collectPayment(currency){
     const uid = auth.currentUser.uid;
     let amount, cardNumber, expiry, cvc;
-    if(currency==='NGN'){
+    if(currency==="NGN"){
         amount=document.getElementById("posAmountNGN").value;
         cardNumber=document.getElementById("posCardNumberNGN").value;
         expiry=document.getElementById("posCardExpiryNGN").value;
         cvc=document.getElementById("posCardCVCNGN").value;
-    } else if(currency==='GH₵'){
+    } else if(currency==="GH₵"){
         amount=document.getElementById("posAmountGHC").value;
         cardNumber=document.getElementById("posCardNumberGHC").value;
         expiry=document.getElementById("posCardExpiryGHC").value;
         cvc=document.getElementById("posCardCVCGHC").value;
-    } else if(currency==='RWF'){
+    } else if(currency==="RWF"){
         amount=document.getElementById("posAmountRWF").value;
         cardNumber=document.getElementById("posCardNumberRWF").value;
         expiry=document.getElementById("posCardExpiryRWF").value;
@@ -218,12 +181,11 @@ function collectPayment(currency){
     if(!amount||!cardNumber||!expiry||!cvc) return alert("Fill all details");
 
     FlutterwaveCheckout({
-        public_key: "FLWPUBK-005ee3c126a79286e3d25ba753637e43-X",
-        tx_ref: "POS-" + Date.now(),
-        amount: amount,
-        currency: currency,
-        payment_options: "card",
-        customer:{ email:auth.currentUser.email, phonenumber:"0000000000", name:auth.currentUser.displayName || "User"},
+        public_key:"FLWPUBK-005ee3c126a79286e3d25ba753637e43-X",
+        tx_ref:"POS-"+Date.now(),
+        amount, currency,
+        payment_options:"card",
+        customer:{email:auth.currentUser.email, phonenumber:"0000000000", name:auth.currentUser.displayName||"User"},
         callback:function(data){
             if(data.status==="successful"){
                 alert(`${currency} Payment Received`);
@@ -232,39 +194,35 @@ function collectPayment(currency){
                 loadWalletBalances(uid);
             } else alert("Payment failed");
         },
-        customizations:{ title:"Kollect POS", description:"Accept Payment", logo:"" }
+        customizations:{title:"Kollect POS", description:"Accept Payment", logo:""}
     });
 }
 
-// -----------------------------------
+// -------------------------
 // RECEIVE PAYMENT
-// -----------------------------------
+// -------------------------
 function generatePaymentRequest(){
     const uid = auth.currentUser.uid;
     const currency = document.getElementById("receiveCurrency").value;
     const amount = parseFloat(document.getElementById("receiveAmount").value);
     if(!amount) return alert("Enter valid amount");
-
     const link = `https://checkout.flutterwave.com/v3/hosted/pay?amount=${amount}&currency=${currency}&tx_ref=RCV-${Date.now()}&customer[email]=${auth.currentUser.email}`;
     document.getElementById("receiveLink").innerHTML=`Payment Link: <a href="${link}" target="_blank">${link}</a>`;
     addTransaction(uid,currency,amount,"Receive Payment Request");
 }
 
-// -----------------------------------
+// -------------------------
 // SMOOTH TAB SWITCHING
-// -----------------------------------
+// -------------------------
 document.addEventListener("DOMContentLoaded", () => {
     const tabs = document.querySelectorAll(".tab-bar button");
     const contents = document.querySelectorAll(".tab-content");
-
-    tabs.forEach((tab, index) => {
-        tab.addEventListener("click", () => {
-            tabs.forEach(t => t.classList.remove("active"));
+    tabs.forEach((tab,index)=>{
+        tab.addEventListener("click",()=>{
+            tabs.forEach(t=>t.classList.remove("active"));
             tab.classList.add("active");
-
-            contents.forEach(c => c.classList.remove("active"));
-            const current = contents[index];
-            current.classList.add("active");
+            contents.forEach(c=>c.classList.remove("active"));
+            contents[index].classList.add("active");
         });
     });
 });
