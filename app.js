@@ -1,15 +1,96 @@
 // -----------------------------------
-// AUTH LISTENER
+// FIREBASE REFERENCES
+// -----------------------------------
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// -----------------------------------
+// AUTH STATE LISTENER
 // -----------------------------------
 auth.onAuthStateChanged(user => {
-    if(!user){
+    if(!user && !window.location.href.includes("login.html") && !window.location.href.includes("signup.html")){
+        // Not logged in → redirect to login
         window.location.href = "login.html";
-    } else {
+    } else if(user && window.location.href.includes("login.html")){
+        // Already logged in → redirect to dashboard
+        window.location.href = "dashboard.html";
+    } else if(user){
+        // Load wallets & transactions on dashboard
         loadWalletBalances(user.uid);
         loadTransactions(user.uid);
     }
 });
 
+// -----------------------------------
+// SIGN UP FUNCTION
+// -----------------------------------
+function signUp(){
+    const type = document.getElementById("accountType").value;
+    let email, password, extraData;
+
+    if(type === "individual"){
+        const name = document.getElementById("name").value;
+        const phone = document.getElementById("phone").value;
+        email = document.getElementById("email").value;
+        password = document.getElementById("password").value;
+        const profession = document.getElementById("profession").value;
+
+        if(!name || !phone || !email || !password || !profession) return alert("Please fill all fields");
+
+        extraData = {name, phone, profession, type:"individual"};
+
+    } else if(type === "business"){
+        const businessName = document.getElementById("businessName").value;
+        const businessPhone = document.getElementById("businessPhone").value;
+        email = document.getElementById("businessEmail").value;
+        password = document.getElementById("businessPassword").value;
+        const businessType = document.getElementById("businessType").value;
+
+        if(!businessName || !businessPhone || !email || !password || !businessType) return alert("Please fill all fields");
+
+        extraData = {businessName, businessPhone, businessType, type:"business"};
+    }
+
+    // CREATE USER WITH FIREBASE AUTH
+    auth.createUserWithEmailAndPassword(email, password)
+        .then(cred => {
+            const uid = cred.user.uid;
+
+            // SAVE ADDITIONAL INFO IN FIRESTORE
+            db.collection("users").doc(uid).set(extraData)
+              .then(()=>{
+                  // Initialize wallets for this user
+                  ["NGN","GH₵","RWF"].forEach(currency=>{
+                      db.collection("wallets").doc(uid).collection("balances").doc(currency).set({amount:0});
+                  });
+
+                  // Redirect to dashboard
+                  window.location.href = "dashboard.html";
+              })
+              .catch(err=> alert("Error saving user info: "+err.message));
+        })
+        .catch(err => alert("Error creating user: "+err.message));
+}
+
+// -----------------------------------
+// LOGIN FUNCTION
+// -----------------------------------
+function login(){
+    const email = document.getElementById("loginEmail").value;
+    const password = document.getElementById("loginPassword").value;
+
+    if(!email || !password) return alert("Enter email and password");
+
+    auth.signInWithEmailAndPassword(email, password)
+        .then(cred=>{
+            window.location.href = "dashboard.html";
+        })
+        .catch(err=> alert("Login error: "+err.message));
+}
+
+// -----------------------------------
+// LOGOUT
+// -----------------------------------
 function logout(){
     auth.signOut();
 }
@@ -66,6 +147,7 @@ function addTransaction(uid,currency,amount,type){
 
 function loadTransactions(uid){
     const list = document.getElementById("transaction-list");
+    if(!list) return;
     list.innerHTML="";
     db.collection("transactions").doc(uid).collection("userTxns")
       .orderBy("timestamp","desc")
@@ -122,11 +204,6 @@ function collectPayment(currency){
         cardNumber=document.getElementById("posCardNumberNGN").value;
         expiry=document.getElementById("posCardExpiryNGN").value;
         cvc=document.getElementById("posCardCVCNGN").value;
-    } else if(currency==='USD'){
-        amount=document.getElementById("posAmountUSD").value;
-        cardNumber=document.getElementById("posCardNumberUSD").value;
-        expiry=document.getElementById("posCardExpiryUSD").value;
-        cvc=document.getElementById("posCardCVCUSD").value;
     } else if(currency==='GH₵'){
         amount=document.getElementById("posAmountGHC").value;
         cardNumber=document.getElementById("posCardNumberGHC").value;
@@ -157,16 +234,6 @@ function collectPayment(currency){
         },
         customizations:{ title:"Kollect POS", description:"Accept Payment", logo:"" }
     });
-}
-
-// -----------------------------------
-// PAYMENTS & TRANSFERS
-// -----------------------------------
-function sendToUser(){
-    alert("Send to Kollect user - implement backend logic");
-}
-function withdraw(){
-    alert("Withdraw to Bank - implement backend logic");
 }
 
 // -----------------------------------
